@@ -6,13 +6,18 @@
 document.addEventListener('DOMContentLoaded', () => {
     
     // ==========================================
-    // 1. DYNAMIC THEME SYSTEM (LOCALSTORAGE PRESERVING)
+    // 1. DYNAMIC THEME SYSTEM (LOCALSTORAGE PRESERVING - SAFE)
     // ==========================================
     const themeBtn = document.getElementById('theme-btn');
     const themeIcon = document.getElementById('theme-icon');
     
-    // Read cached preference or default to dark
-    const cachedTheme = localStorage.getItem('vivek-portfolio-theme') || 'dark';
+    // Safely read cached preference or default to dark
+    let cachedTheme = 'dark';
+    try {
+        cachedTheme = localStorage.getItem('vivek-portfolio-theme') || 'dark';
+    } catch (e) {
+        console.warn('LocalStorage is restricted in this environment. Defaulting to dark theme.');
+    }
     setTheme(cachedTheme);
 
     themeBtn.addEventListener('click', () => {
@@ -23,7 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('vivek-portfolio-theme', theme);
+        try {
+            localStorage.setItem('vivek-portfolio-theme', theme);
+        } catch (e) {
+            // Silently ignore storage quota/sandbox restrictions
+        }
         
         if (theme === 'dark') {
             themeIcon.className = 'fa-solid fa-moon';
@@ -165,46 +174,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 6. SCROLL REVEAL ANIMATIONS (INTERSECTION OBSERVER)
+    // 6. SCROLL REVEAL ANIMATIONS (INTERSECTION OBSERVER WITH SAFE FALLBACKS)
     // ==========================================
     const revealElements = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-stagger');
-
-    const revealObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('active');
-                observer.unobserve(entry.target); // Reveal only once
-            }
-        });
-    }, {
-        threshold: 0.12,
-        rootMargin: '0px 0px -50px 0px'
-    });
-
-    revealElements.forEach(element => {
-        revealObserver.observe(element);
-    });
-
-    // ==========================================
-    // 7. SKILLS LOADING fill TRANSITION
-    // ==========================================
     const skillsSection = document.getElementById('skills');
     const skillFills = document.querySelectorAll('.skill-level-fill');
 
-    if (skillsSection && skillFills.length > 0) {
-        const skillsObserver = new IntersectionObserver((entries, observer) => {
+    if (!window.IntersectionObserver) {
+        // Fallback: Reveal all elements immediately if the browser doesn't support the observer
+        revealElements.forEach(element => element.classList.add('active'));
+        skillFills.forEach(fill => {
+            const targetVal = fill.getAttribute('data-percent');
+            fill.style.width = `${targetVal}%`;
+        });
+    } else {
+        // Intersection Observer configuration
+        const revealObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    skillFills.forEach(fill => {
-                        const targetVal = fill.getAttribute('data-percent');
-                        fill.style.width = `${targetVal}%`;
-                    });
-                    observer.unobserve(entry.target);
+                    entry.target.classList.add('active');
+                    observer.unobserve(entry.target); // Reveal only once
                 }
             });
-        }, { threshold: 0.2 });
+        }, {
+            threshold: 0.12,
+            rootMargin: '0px 0px -50px 0px'
+        });
 
-        skillsObserver.observe(skillsSection);
+        revealElements.forEach(element => {
+            revealObserver.observe(element);
+        });
+
+        // ==========================================
+        // 7. SKILLS LOADING fill TRANSITION
+        // ==========================================
+        if (skillsSection && skillFills.length > 0) {
+            const skillsObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        skillFills.forEach(fill => {
+                            const targetVal = fill.getAttribute('data-percent');
+                            fill.style.width = `${targetVal}%`;
+                        });
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.2 });
+
+            skillsObserver.observe(skillsSection);
+        }
     }
 
     // ==========================================
